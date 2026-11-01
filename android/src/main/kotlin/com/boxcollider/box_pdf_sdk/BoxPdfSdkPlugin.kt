@@ -1,38 +1,47 @@
 package com.boxcollider.box_pdf_sdk
 
+import android.os.Build
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
-import io.flutter.plugin.common.MethodChannel.MethodCallHandler
-import io.flutter.plugin.common.MethodChannel.Result
 
-/** BoxPdfSdkPlugin */
-class BoxPdfSdkPlugin :
-    FlutterPlugin,
-    MethodCallHandler {
-    // The MethodChannel that will the communication between Flutter and native Android
-    //
-    // This local reference serves to register the plugin with the Flutter Engine and unregister it
-    // when the Flutter Engine is detached from the Activity
-    private lateinit var channel: MethodChannel
+class BoxPdfSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
 
-    override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
-        channel = MethodChannel(flutterPluginBinding.binaryMessenger, "box_pdf_sdk")
-        channel.setMethodCallHandler(this)
+    private var channel: MethodChannel? = null
+
+    override fun onAttachedToEngine(
+        binding: FlutterPlugin.FlutterPluginBinding
+    ) {
+        channel = MethodChannel(
+            binding.binaryMessenger,
+            "box_pdf_sdk"
+        )
+
+        channel?.setMethodCallHandler(this)
+
+        binding.platformViewRegistry.registerViewFactory(
+            "com.boxcollider/box_pdf_viewer",
+            BoxPdfViewFactory()
+        )
     }
 
     override fun onMethodCall(
         call: MethodCall,
-        result: Result
+        result: MethodChannel.Result
     ) {
-        if (call.method == "getPlatformVersion") {
-            result.success("Android ${android.os.Build.VERSION.RELEASE}")
-        } else {
-            result.notImplemented()
+        when (call.method) {
+            "getPlatformVersion" -> {
+                result.success("Android ${Build.VERSION.RELEASE}")
+            }
+
+            else -> result.notImplemented()
         }
     }
 
-    override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-        channel.setMethodCallHandler(null)
+    override fun onDetachedFromEngine(
+        binding: FlutterPlugin.FlutterPluginBinding
+    ) {
+        channel?.setMethodCallHandler(null)
+        channel = null
     }
 }

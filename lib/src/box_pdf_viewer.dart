@@ -1,64 +1,28 @@
-// lib/src/box_pdf_viewer.dart
-import 'dart:async';
+import 'dart:typed_data';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'pdf_annotation.dart';
+class BoxPdfViewer extends StatelessWidget {
+  const BoxPdfViewer({super.key, required this.bytes});
 
-class BoxPdfViewer extends StatefulWidget {
-  const BoxPdfViewer({
-    super.key,
-    required this.filePath,
-    this.onAnnotationAdded,
-    this.onAnnotationUpdated,
-  });
-
-  final String filePath;
-  final ValueChanged<PdfAnnotation>? onAnnotationAdded;
-  final ValueChanged<PdfAnnotation>? onAnnotationUpdated;
-
-  @override
-  State<BoxPdfViewer> createState() => _BoxPdfViewerState();
-}
-
-class _BoxPdfViewerState extends State<BoxPdfViewer> {
-  static const _viewType = 'com.boxcollider/box_pdf_viewer';
-
-  MethodChannel? _channel;
-  StreamSubscription<dynamic>? _events;
-
-  @override
-  void dispose() {
-    _events?.cancel();
-    super.dispose();
-  }
-
-  void _onViewCreated(int id) {
-    _channel = MethodChannel('com.boxcollider/box_pdf_viewer_$id');
-
-    final event = EventChannel('com.boxcollider/box_pdf_viewer_events_$id');
-    _events = event.receiveBroadcastStream().listen((data) {
-      final map = Map<Object?, Object?>.from(data as Map);
-      final annotation = PdfAnnotation.fromMap(map);
-
-      switch (map['event']) {
-        case 'annotationAdded':
-          widget.onAnnotationAdded?.call(annotation);
-        case 'annotationUpdated':
-          widget.onAnnotationUpdated?.call(annotation);
-      }
-    });
-
-    _channel?.invokeMethod<void>('open', {'path': widget.filePath});
-  }
+  final Uint8List bytes;
 
   @override
   Widget build(BuildContext context) {
+    if (defaultTargetPlatform != TargetPlatform.android) {
+      return const Center(
+        child: Text(
+          'El visor PDF está implementado solo para Android por ahora.',
+        ),
+      );
+    }
+
     return AndroidView(
-      viewType: _viewType,
-      creationParams: {'path': widget.filePath},
+      viewType: 'com.boxcollider/box_pdf_viewer',
+      creationParams: <String, Object>{'bytes': bytes},
       creationParamsCodec: const StandardMessageCodec(),
-      onPlatformViewCreated: _onViewCreated,
     );
   }
 }

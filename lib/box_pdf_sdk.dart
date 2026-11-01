@@ -4,7 +4,7 @@
 // same directory. You can also find a detailed instruction on how to add
 // platforms in the `pubspec.yaml` at
 // https://flutter.dev/to/pubspec-plugin-platforms.
-
+export 'src/box_pdf_viewer.dart';
 import 'box_pdf_sdk_platform_interface.dart';
 
 class BoxPdfSdk {
