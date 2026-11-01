@@ -10,7 +10,7 @@ import android.os.ParcelFileDescriptor
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
-import android.widget.ImageView
+//import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import io.flutter.plugin.platform.PlatformView
@@ -46,11 +46,8 @@ class BoxPdfView(
         text = "Preparando PDF..."
     }
 
-    private val image = ImageView(context).apply {
-        scaleType = ImageView.ScaleType.FIT_CENTER
-        adjustViewBounds = true
-    }
-
+    private val image = ZoomPdfImageView(context)
+    
     private val previousButton = Button(context).apply {
         text = "Anterior"
         isEnabled = false
