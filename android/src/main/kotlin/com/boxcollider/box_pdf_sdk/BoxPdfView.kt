@@ -18,6 +18,9 @@ import java.io.File
 import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 import android.widget.Toast
+import android.util.Log
+
+
 class BoxPdfView(
     private val context: Context,
     private val pdfBytes: ByteArray?
@@ -75,6 +78,10 @@ class BoxPdfView(
         text = "Siguiente"
         isEnabled = false
     }
+    private val exportButton = Button(context).apply {
+        text = "Exportar PDF"
+    }
+
     private var selectedColorIndex = 0
     private var selectedWidthIndex = 1
 
@@ -157,7 +164,11 @@ class BoxPdfView(
             gravity = Gravity.CENTER
         }
 
-        listOf(saveButton, loadButton).forEach { button ->
+        listOf(
+            saveButton,
+            loadButton,
+            exportButton
+        ).forEach { button ->
             storageControls.addView(
                 button,
                 LinearLayout.LayoutParams(
@@ -327,6 +338,112 @@ class BoxPdfView(
             }
         }
 
+                exportButton.setOnClickListener {
+            val bytes = pdfBytes
+
+            if (bytes == null) {
+                Toast.makeText(
+                    context,
+                    "No hay documento abierto.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                // La copia de los trazos se toma aquí,
+                // antes de pasar al hilo de trabajo.
+                val exportTask = image.createExportTask(bytes)
+
+                exportButton.isEnabled = false
+                exportButton.text = "Exportando..."
+
+                executor.execute {
+                    try {
+                        val file = exportTask()
+
+                        mainHandler.post {
+                            if (!disposed) {
+                                exportButton.isEnabled = true
+                                exportButton.text = "Exportar PDF"
+
+                                Toast.makeText(
+                                    context,
+                                    "PDF exportado: ${file.name}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    } catch (error: Exception) {
+                        mainHandler.post {
+                            if (!disposed) {
+                                exportButton.isEnabled = true
+                                exportButton.text = "Exportar PDF"
+
+                                Toast.makeText(
+                                    context,
+                                    "Error: ${error.message}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        val documentBytes = pdfBytes
+
+        if (documentBytes != null) {
+            var storageReady = true
+
+            // Primero restauramos las anotaciones.
+            try {
+                image.loadAnnotations(documentBytes)
+            } catch (error: Exception) {
+                storageReady = false
+
+                Log.e(
+                    "BoxPdfSdk",
+                    "No se pudieron recuperar las anotaciones",
+                    error
+                )
+
+                Toast.makeText(
+                    context,
+                    "No se pudieron cargar las anotaciones. " +
+                        "No se sobrescribirá el archivo guardado.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+
+            // No sobrescribir un archivo que no logramos leer.
+            if (storageReady) {
+                image.onAnnotationsChanged = {
+                    val saveTask =
+                        image.createSaveTask(documentBytes)
+
+                    executor.execute {
+                        try {
+                            saveTask()
+                        } catch (error: Exception) {
+                            Log.e(
+                                "BoxPdfSdk",
+                                "Falló el autoguardado",
+                                error
+                            )
+
+                            mainHandler.post {
+                                if (!disposed) {
+                                    Toast.makeText(
+                                        context,
+                                        "No se pudieron guardar " +
+                                            "las anotaciones.",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
         renderPage(0)
     }
 
@@ -463,6 +580,10 @@ class BoxPdfView(
 
     override fun dispose() {
         disposed = true
+
+        image.onAnnotationsChanged = null
+
+        // Permite terminar los guardados que ya están en cola.
         executor.shutdown()
 
         image.setImageDrawable(null)
