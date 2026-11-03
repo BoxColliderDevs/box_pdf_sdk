@@ -17,7 +17,7 @@ import io.flutter.plugin.platform.PlatformView
 import java.io.File
 import java.util.concurrent.Executors
 import kotlin.math.roundToInt
-
+import android.widget.Toast
 class BoxPdfView(
     private val context: Context,
     private val pdfBytes: ByteArray?
@@ -32,6 +32,14 @@ class BoxPdfView(
     private var currentPage = 0
     private var totalPages = 0
     private var currentBitmap: Bitmap? = null
+
+    private val saveButton = Button(context).apply {
+        text = "Guardar"
+    }
+
+    private val loadButton = Button(context).apply {
+        text = "Cargar"
+    }
 
     private val root = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
@@ -142,6 +150,86 @@ class BoxPdfView(
                     1f
                 )
             )
+        }
+
+                val storageControls = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+
+        listOf(saveButton, loadButton).forEach { button ->
+            storageControls.addView(
+                button,
+                LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f
+                )
+            )
+        }
+
+        root.addView(storageControls)
+
+        saveButton.setOnClickListener {
+            val bytes = pdfBytes
+
+            if (bytes == null) {
+                Toast.makeText(
+                    context,
+                    "No hay documento abierto.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                try {
+                    val count = image.saveAnnotations(bytes)
+
+                    Toast.makeText(
+                        context,
+                        "Guardados $count trazos.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } catch (error: Exception) {
+                    Toast.makeText(
+                        context,
+                        "Error al guardar: ${error.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+
+        loadButton.setOnClickListener {
+            val bytes = pdfBytes
+
+            if (bytes == null) {
+                Toast.makeText(
+                    context,
+                    "No hay documento abierto.",
+                    Toast.LENGTH_SHORT
+                ).show()
+            } else {
+                try {
+                    val count = image.loadAnnotations(bytes)
+
+                    val message = if (count == -1) {
+                        "Este PDF no tiene anotaciones guardadas."
+                    } else {
+                        "Recuperados $count trazos."
+                    }
+
+                    Toast.makeText(
+                        context,
+                        message,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } catch (error: Exception) {
+                    Toast.makeText(
+                        context,
+                        "Error al cargar: ${error.message}",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
         }
 
         root.addView(styleControls)

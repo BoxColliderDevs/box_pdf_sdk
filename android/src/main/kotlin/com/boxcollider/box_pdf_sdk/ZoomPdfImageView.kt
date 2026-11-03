@@ -12,6 +12,10 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
+import java.io.File
+import java.security.MessageDigest
+import org.json.JSONArray
+import org.json.JSONObject
 
 class ZoomPdfImageView(context: Context) : ImageView(context) {
     var drawingEnabled = false
@@ -21,7 +25,8 @@ class ZoomPdfImageView(context: Context) : ImageView(context) {
 
     private data class InkStroke(
         val path: Path,
-        val paint: Paint
+        val paint: Paint,
+        val points: MutableList<FloatArray>
     )
 
     private val pageStrokes =
@@ -242,6 +247,177 @@ class ZoomPdfImageView(context: Context) : ImageView(context) {
         canvas.restoreToCount(checkpoint)
     }
 
+    private fun annotationFile(pdfBytes: ByteArray): File {
+        val digest = MessageDigest
+            .getInstance("SHA-256")
+            .digest(pdfBytes)
+
+        val documentId = digest.joinToString("") { byte ->
+            "%02x".format(byte.toInt() and 0xff)
+        }
+
+        val directory = File(
+            context.filesDir,
+            "pdf_annotations"
+        )
+
+        check(directory.exists() || directory.mkdirs()) {
+            "No se pudo crear la carpeta de anotaciones."
+        }
+
+        return File(directory, "$documentId.json")
+    }
+
+    fun saveAnnotations(pdfBytes: ByteArray): Int {
+        val pagesJson = JSONArray()
+        var strokeCount = 0
+
+        pageStrokes.toSortedMap().forEach { (pageIndex, strokes) ->
+            val strokesJson = JSONArray()
+
+            strokes.forEach { stroke ->
+                val pointsJson = JSONArray()
+
+                stroke.points.forEach { point ->
+                    pointsJson.put(
+                        JSONArray()
+                            .put(point[0].toDouble())
+                            .put(point[1].toDouble())
+                    )
+                }
+
+                strokesJson.put(
+                    JSONObject()
+                        .put("color", stroke.paint.color)
+                        .put(
+                            "width",
+                            stroke.paint.strokeWidth.toDouble()
+                        )
+                        .put("points", pointsJson)
+                )
+
+                strokeCount++
+            }
+
+            pagesJson.put(
+                JSONObject()
+                    .put("page", pageIndex)
+                    .put("strokes", strokesJson)
+            )
+        }
+
+        val documentJson = JSONObject()
+            .put("version", 1)
+            .put("pages", pagesJson)
+
+        annotationFile(pdfBytes).writeText(
+            documentJson.toString(),
+            Charsets.UTF_8
+        )
+
+        return strokeCount
+    }
+
+    fun loadAnnotations(pdfBytes: ByteArray): Int {
+        val file = annotationFile(pdfBytes)
+
+        if (!file.exists()) {
+            return -1
+        }
+
+        val documentJson = JSONObject(
+            file.readText(Charsets.UTF_8)
+        )
+
+        require(documentJson.getInt("version") == 1) {
+            "Versión de anotaciones no compatible."
+        }
+
+        val restoredPages =
+            mutableMapOf<Int, MutableList<InkStroke>>()
+
+        val pagesJson = documentJson.getJSONArray("pages")
+        var strokeCount = 0
+
+        for (pagePosition in 0 until pagesJson.length()) {
+            val pageJson = pagesJson.getJSONObject(pagePosition)
+            val pageIndex = pageJson.getInt("page")
+
+            require(pageIndex >= 0) {
+                "Índice de página inválido."
+            }
+
+            val strokesJson = pageJson.getJSONArray("strokes")
+            val restoredStrokes = mutableListOf<InkStroke>()
+
+            for (strokeIndex in 0 until strokesJson.length()) {
+                val strokeJson =
+                    strokesJson.getJSONObject(strokeIndex)
+
+                val pointsJson =
+                    strokeJson.getJSONArray("points")
+
+                if (pointsJson.length() == 0) continue
+
+                val points = mutableListOf<FloatArray>()
+                val path = Path()
+
+                for (pointIndex in 0 until pointsJson.length()) {
+                    val pointJson =
+                        pointsJson.getJSONArray(pointIndex)
+
+                    val x = pointJson.getDouble(0).toFloat()
+                    val y = pointJson.getDouble(1).toFloat()
+
+                    require(x.isFinite() && y.isFinite()) {
+                        "Coordenadas inválidas."
+                    }
+
+                    points.add(floatArrayOf(x, y))
+
+                    if (pointIndex == 0) {
+                        path.moveTo(x, y)
+                    } else {
+                        path.lineTo(x, y)
+                    }
+                }
+
+                val width =
+                    strokeJson.getDouble("width").toFloat()
+
+                require(width.isFinite() && width > 0f) {
+                    "Grosor inválido."
+                }
+
+                val paint = Paint(inkPaint).apply {
+                    color = strokeJson.getInt("color")
+                    strokeWidth = width
+                }
+
+                restoredStrokes.add(
+                    InkStroke(
+                        path = path,
+                        paint = paint,
+                        points = points
+                    )
+                )
+
+                strokeCount++
+            }
+
+            restoredPages[pageIndex] = restoredStrokes
+        }
+
+        // Solo reemplazamos los dibujos si todo se leyó bien.
+        pendingStroke = null
+        pageStrokes.clear()
+        pageStrokes.putAll(restoredPages)
+
+        invalidate()
+
+        return strokeCount
+    }
+
     private fun normalizedPoint(
         event: MotionEvent
     ): FloatArray? {
@@ -288,7 +464,10 @@ class ZoomPdfImageView(context: Context) : ImageView(context) {
 
                 pendingStroke = InkStroke(
                     path = path,
-                    paint = Paint(inkPaint)
+                    paint = Paint(inkPaint),
+                    points = mutableListOf(
+                        floatArrayOf(point[0], point[1])
+                    )
                 )
 
                 invalidate()
@@ -298,10 +477,13 @@ class ZoomPdfImageView(context: Context) : ImageView(context) {
                 if (pendingStroke != null && event.pointerCount == 1) {
                     val point = normalizedPoint(event) ?: return true
 
-                    pendingStroke?.path?.lineTo(
-                        point[0],
-                        point[1]
-                    )
+                    pendingStroke?.let { stroke ->
+                        stroke.path.lineTo(point[0], point[1])
+
+                        stroke.points.add(
+                            floatArrayOf(point[0], point[1])
+                        )
+                    }
 
                     invalidate()
                 }
@@ -313,6 +495,9 @@ class ZoomPdfImageView(context: Context) : ImageView(context) {
                         stroke.path.lineTo(
                             point[0],
                             point[1]
+                        )
+                        stroke.points.add(
+                            floatArrayOf(point[0], point[1])
                         )
                     }
 
