@@ -10,7 +10,6 @@ import android.os.ParcelFileDescriptor
 import android.view.Gravity
 import android.view.View
 import android.widget.Button
-//import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import io.flutter.plugin.platform.PlatformView
@@ -19,7 +18,6 @@ import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 import android.widget.Toast
 import android.util.Log
-
 
 class BoxPdfView(
     private val context: Context,
@@ -35,14 +33,6 @@ class BoxPdfView(
     private var currentPage = 0
     private var totalPages = 0
     private var currentBitmap: Bitmap? = null
-
-    private val saveButton = Button(context).apply {
-        text = "Guardar"
-    }
-
-    private val loadButton = Button(context).apply {
-        text = "Cargar"
-    }
 
     private val root = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
@@ -77,9 +67,6 @@ class BoxPdfView(
     private val nextButton = Button(context).apply {
         text = "Siguiente"
         isEnabled = false
-    }
-    private val exportButton = Button(context).apply {
-        text = "Exportar PDF"
     }
 
     private var selectedColorIndex = 0
@@ -159,91 +146,7 @@ class BoxPdfView(
             )
         }
 
-                val storageControls = LinearLayout(context).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-        }
-
-        listOf(
-            saveButton,
-            loadButton,
-            exportButton
-        ).forEach { button ->
-            storageControls.addView(
-                button,
-                LinearLayout.LayoutParams(
-                    0,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    1f
-                )
-            )
-        }
-
-        root.addView(storageControls)
-
-        saveButton.setOnClickListener {
-            val bytes = pdfBytes
-
-            if (bytes == null) {
-                Toast.makeText(
-                    context,
-                    "No hay documento abierto.",
-                    Toast.LENGTH_SHORT
-                ).show()
-            } else {
-                try {
-                    val count = image.saveAnnotations(bytes)
-
-                    Toast.makeText(
-                        context,
-                        "Guardados $count trazos.",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                } catch (error: Exception) {
-                    Toast.makeText(
-                        context,
-                        "Error al guardar: ${error.message}",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            }
-        }
-
-        loadButton.setOnClickListener {
-            val bytes = pdfBytes
-
-            if (bytes == null) {
-                Toast.makeText(
-                    context,
-                    "No hay documento abierto.",
-                    Toast.LENGTH_SHORT
-                ).show()
-            } else {
-                try {
-                    val count = image.loadAnnotations(bytes)
-
-                    val message = if (count == -1) {
-                        "Este PDF no tiene anotaciones guardadas."
-                    } else {
-                        "Recuperados $count trazos."
-                    }
-
-                    Toast.makeText(
-                        context,
-                        message,
-                        Toast.LENGTH_SHORT
-                    ).show()
-                } catch (error: Exception) {
-                    Toast.makeText(
-                        context,
-                        "Error al cargar: ${error.message}",
-                        Toast.LENGTH_LONG
-                    ).show()
-                }
-            }
-        }
-
-        root.addView(styleControls)
+                root.addView(styleControls)
 
         colorButton.setOnClickListener {
             val names = arrayOf(
@@ -338,56 +241,6 @@ class BoxPdfView(
             }
         }
 
-                exportButton.setOnClickListener {
-            val bytes = pdfBytes
-
-            if (bytes == null) {
-                Toast.makeText(
-                    context,
-                    "No hay documento abierto.",
-                    Toast.LENGTH_SHORT
-                ).show()
-            } else {
-                // La copia de los trazos se toma aquí,
-                // antes de pasar al hilo de trabajo.
-                val exportTask = image.createExportTask(bytes)
-
-                exportButton.isEnabled = false
-                exportButton.text = "Exportando..."
-
-                executor.execute {
-                    try {
-                        val file = exportTask()
-
-                        mainHandler.post {
-                            if (!disposed) {
-                                exportButton.isEnabled = true
-                                exportButton.text = "Exportar PDF"
-
-                                Toast.makeText(
-                                    context,
-                                    "PDF exportado: ${file.name}",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            }
-                        }
-                    } catch (error: Exception) {
-                        mainHandler.post {
-                            if (!disposed) {
-                                exportButton.isEnabled = true
-                                exportButton.text = "Exportar PDF"
-
-                                Toast.makeText(
-                                    context,
-                                    "Error: ${error.message}",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            }
-                        }
-                    }
-                }
-            }
-        }
         val documentBytes = pdfBytes
 
         if (documentBytes != null) {

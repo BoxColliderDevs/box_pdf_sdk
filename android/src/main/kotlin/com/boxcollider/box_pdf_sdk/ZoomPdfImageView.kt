@@ -16,10 +16,6 @@ import java.io.File
 import java.security.MessageDigest
 import org.json.JSONArray
 import org.json.JSONObject
-import android.graphics.pdf.PdfDocument
-import android.graphics.pdf.PdfRenderer
-import android.os.ParcelFileDescriptor
-import kotlin.math.roundToInt
 import android.util.AtomicFile
 
 class ZoomPdfImageView(context: Context) : ImageView(context) {
@@ -51,7 +47,6 @@ class ZoomPdfImageView(context: Context) : ImageView(context) {
         strokeJoin = Paint.Join.ROUND
     }
     private val transform = Matrix()
-    //private val values = FloatArray(9)
 
     private var minimumScale = 1f
     private var currentScale = 1f
@@ -446,176 +441,6 @@ class ZoomPdfImageView(context: Context) : ImageView(context) {
         invalidate()
 
         return strokeCount
-    }
-
-        fun createExportTask(pdfBytes: ByteArray): () -> File {
-        // Copia independiente de los trazos actuales.
-        val snapshot = pageStrokes.mapValues { (_, strokes) ->
-            strokes.map { stroke ->
-                Pair(
-                    Path(stroke.path),
-                    Paint(stroke.paint)
-                )
-            }
-        }
-
-        val cacheDirectory = context.cacheDir
-        val exportDirectory = File(
-            context.filesDir,
-            "pdf_exports"
-        )
-
-        return {
-            check(
-                exportDirectory.exists() ||
-                    exportDirectory.mkdirs()
-            ) {
-                "No se pudo crear la carpeta de exportación."
-            }
-
-            val sourceFile = File.createTempFile(
-                "box_pdf_source_",
-                ".pdf",
-                cacheDirectory
-            )
-
-            val outputFile = File.createTempFile(
-                "anotado_",
-                ".pdf",
-                exportDirectory
-            )
-
-            try {
-                sourceFile.writeBytes(pdfBytes)
-
-                val descriptor = ParcelFileDescriptor.open(
-                    sourceFile,
-                    ParcelFileDescriptor.MODE_READ_ONLY
-                )
-
-                val renderer = try {
-                    PdfRenderer(descriptor)
-                } catch (error: Exception) {
-                    descriptor.close()
-                    throw error
-                }
-
-                renderer.use { source ->
-                    val output = PdfDocument()
-
-                    try {
-                        for (index in 0 until source.pageCount) {
-                            source.openPage(index).use { sourcePage ->
-                                val pageWidth = sourcePage.width
-                                val pageHeight = sourcePage.height
-
-                                // Limita la imagen a 2000 px en su lado mayor.
-                                val renderScale =
-                                    2000f / maxOf(pageWidth, pageHeight)
-
-                                val bitmapWidth = (
-                                    pageWidth * renderScale
-                                ).roundToInt().coerceAtLeast(1)
-
-                                val bitmapHeight = (
-                                    pageHeight * renderScale
-                                ).roundToInt().coerceAtLeast(1)
-
-                                val bitmap = Bitmap.createBitmap(
-                                    bitmapWidth,
-                                    bitmapHeight,
-                                    Bitmap.Config.ARGB_8888
-                                )
-
-                                try {
-                                    bitmap.eraseColor(Color.WHITE)
-
-                                    sourcePage.render(
-                                        bitmap,
-                                        null,
-                                        null,
-                                        PdfRenderer.Page.RENDER_MODE_FOR_PRINT
-                                    )
-
-                                    val pageInfo =
-                                        PdfDocument.PageInfo.Builder(
-                                            pageWidth,
-                                            pageHeight,
-                                            index + 1
-                                        ).create()
-
-                                    val outputPage =
-                                        output.startPage(pageInfo)
-
-                                    try {
-                                        val canvas = outputPage.canvas
-
-                                        val bitmapPaint = Paint(
-                                            Paint.ANTI_ALIAS_FLAG or
-                                                Paint.FILTER_BITMAP_FLAG
-                                        )
-
-                                        canvas.drawBitmap(
-                                            bitmap,
-                                            null,
-                                            RectF(
-                                                0f,
-                                                0f,
-                                                pageWidth.toFloat(),
-                                                pageHeight.toFloat()
-                                            ),
-                                            bitmapPaint
-                                        )
-
-                                        val checkpoint = canvas.save()
-
-                                        try {
-                                            canvas.scale(
-                                                pageWidth.toFloat(),
-                                                pageHeight.toFloat()
-                                            )
-
-                                            canvas.clipRect(
-                                                0f, 0f, 1f, 1f
-                                            )
-
-                                            snapshot[index]?.forEach {
-                                                (path, paint) ->
-                                                canvas.drawPath(
-                                                    path,
-                                                    paint
-                                                )
-                                            }
-                                        } finally {
-                                            canvas.restoreToCount(
-                                                checkpoint
-                                            )
-                                        }
-                                    } finally {
-                                        output.finishPage(outputPage)
-                                    }
-                                } finally {
-                                    bitmap.recycle()
-                                }
-                            }
-                        }
-
-                        outputFile.outputStream().use { stream ->
-                            output.writeTo(stream)
-                        }
-                    } finally {
-                        output.close()
-                    }
-                }
-
-                outputFile
-            } catch (error: Exception) {
-                outputFile.delete()
-                throw error
-            } finally {
-                sourceFile.delete()
-            }
-        }
     }
 
     private fun normalizedPoint(
