@@ -19,10 +19,15 @@ class ZoomPdfImageView(context: Context) : ImageView(context) {
 
     private var activePage = 0
 
-    private val pageStrokes =
-        mutableMapOf<Int, MutableList<Path>>()
+    private data class InkStroke(
+        val path: Path,
+        val paint: Paint
+    )
 
-    private var pendingStroke: Path? = null
+    private val pageStrokes =
+        mutableMapOf<Int, MutableList<InkStroke>>()
+
+    private var pendingStroke: InkStroke? = null
 
     private val inverseTransform = Matrix()
 
@@ -103,7 +108,13 @@ class ZoomPdfImageView(context: Context) : ImageView(context) {
 
         resetZoom()
     }
+    fun setInkColor(color: Int) {
+        inkPaint.color = color
+    }
 
+    fun setInkWidth(width: Float) {
+        inkPaint.strokeWidth = width.coerceIn(0.001f, 0.02f)
+    }
     fun resetZoom() {
         val content = drawable ?: return
 
@@ -221,11 +232,11 @@ class ZoomPdfImageView(context: Context) : ImageView(context) {
         canvas.clipRect(0f, 0f, 1f, 1f)
 
         pageStrokes[activePage]?.forEach { stroke ->
-            canvas.drawPath(stroke, inkPaint)
+            canvas.drawPath(stroke.path, stroke.paint)
         }
 
         pendingStroke?.let { stroke ->
-            canvas.drawPath(stroke, inkPaint)
+            canvas.drawPath(stroke.path, stroke.paint)
         }
 
         canvas.restoreToCount(checkpoint)
@@ -262,7 +273,6 @@ class ZoomPdfImageView(context: Context) : ImageView(context) {
             MotionEvent.ACTION_DOWN -> {
                 val point = normalizedPoint(event) ?: return false
 
-                // No empezar un trazo fuera de la página.
                 if (
                     point[0] !in 0f..1f ||
                     point[1] !in 0f..1f
@@ -272,9 +282,14 @@ class ZoomPdfImageView(context: Context) : ImageView(context) {
 
                 parent?.requestDisallowInterceptTouchEvent(true)
 
-                pendingStroke = Path().apply {
+                val path = Path().apply {
                     moveTo(point[0], point[1])
                 }
+
+                pendingStroke = InkStroke(
+                    path = path,
+                    paint = Paint(inkPaint)
+                )
 
                 invalidate()
             }
@@ -283,7 +298,11 @@ class ZoomPdfImageView(context: Context) : ImageView(context) {
                 if (pendingStroke != null && event.pointerCount == 1) {
                     val point = normalizedPoint(event) ?: return true
 
-                    pendingStroke?.lineTo(point[0], point[1])
+                    pendingStroke?.path?.lineTo(
+                        point[0],
+                        point[1]
+                    )
+
                     invalidate()
                 }
             }
@@ -291,7 +310,10 @@ class ZoomPdfImageView(context: Context) : ImageView(context) {
             MotionEvent.ACTION_UP -> {
                 pendingStroke?.let { stroke ->
                     normalizedPoint(event)?.let { point ->
-                        stroke.lineTo(point[0], point[1])
+                        stroke.path.lineTo(
+                            point[0],
+                            point[1]
+                        )
                     }
 
                     pageStrokes.getOrPut(activePage) {
@@ -309,7 +331,6 @@ class ZoomPdfImageView(context: Context) : ImageView(context) {
 
             MotionEvent.ACTION_POINTER_DOWN,
             MotionEvent.ACTION_CANCEL -> {
-                // Cancelar el trazo si entra otro dedo.
                 pendingStroke = null
 
                 parent?.requestDisallowInterceptTouchEvent(false)
@@ -319,7 +340,7 @@ class ZoomPdfImageView(context: Context) : ImageView(context) {
 
         return true
     }
-    
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (drawable == null) return false
 

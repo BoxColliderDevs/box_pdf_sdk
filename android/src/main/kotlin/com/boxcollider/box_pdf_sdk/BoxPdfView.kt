@@ -1,5 +1,5 @@
 package com.boxcollider.box_pdf_sdk
-
+import android.app.AlertDialog
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -67,6 +67,16 @@ class BoxPdfView(
         text = "Siguiente"
         isEnabled = false
     }
+    private var selectedColorIndex = 0
+    private var selectedWidthIndex = 1
+
+    private val colorButton = Button(context).apply {
+        text = "Color: rojo"
+    }
+
+    private val widthButton = Button(context).apply {
+        text = "Grosor: medio"
+    }
 
     init {
         val controls = LinearLayout(context).apply {
@@ -118,7 +128,85 @@ class BoxPdfView(
                 )
             )
         }
+        val styleControls = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
 
+        listOf(colorButton, widthButton).forEach { button ->
+            styleControls.addView(
+                button,
+                LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f
+                )
+            )
+        }
+
+        root.addView(styleControls)
+
+        colorButton.setOnClickListener {
+            val names = arrayOf(
+                "Rojo",
+                "Azul",
+                "Negro",
+                "Verde"
+            )
+
+            val colors = intArrayOf(
+                Color.RED,
+                Color.BLUE,
+                Color.BLACK,
+                Color.rgb(0, 140, 60)
+            )
+
+            AlertDialog.Builder(context)
+                .setTitle("Color del lápiz")
+                .setSingleChoiceItems(
+                    names,
+                    selectedColorIndex
+                ) { dialog, index ->
+                    selectedColorIndex = index
+
+                    image.setInkColor(colors[index])
+                    colorButton.text = "Color: ${names[index]}"
+
+                    dialog.dismiss()
+                }
+                .setNegativeButton("Cancelar", null)
+                .show()
+        }
+
+        widthButton.setOnClickListener {
+            val names = arrayOf(
+                "Fino",
+                "Medio",
+                "Grueso"
+            )
+
+            val widths = floatArrayOf(
+                0.0015f,
+                0.003f,
+                0.006f
+            )
+
+            AlertDialog.Builder(context)
+                .setTitle("Grosor del lápiz")
+                .setSingleChoiceItems(
+                    names,
+                    selectedWidthIndex
+                ) { dialog, index ->
+                    selectedWidthIndex = index
+
+                    image.setInkWidth(widths[index])
+                    widthButton.text = "Grosor: ${names[index]}"
+
+                    dialog.dismiss()
+                }
+                .setNegativeButton("Cancelar", null)
+                .show()
+        }
         root.addView(drawingControls)
         root.addView(controls)
 
