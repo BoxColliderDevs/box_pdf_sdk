@@ -47,7 +47,17 @@ class BoxPdfView(
     }
 
     private val image = ZoomPdfImageView(context)
-    
+    private val drawingButton = Button(context).apply {
+        text = "Dibujar"
+    }
+
+    private val undoButton = Button(context).apply {
+        text = "Deshacer"
+    }
+
+    private val clearButton = Button(context).apply {
+        text = "Limpiar"
+    }
     private val previousButton = Button(context).apply {
         text = "Anterior"
         isEnabled = false
@@ -93,7 +103,41 @@ class BoxPdfView(
             )
         )
 
+        val drawingControls = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+        }
+
+        listOf(drawingButton, undoButton, clearButton).forEach { button ->
+            drawingControls.addView(
+                button,
+                LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    1f
+                )
+            )
+        }
+
+        root.addView(drawingControls)
         root.addView(controls)
+
+        drawingButton.setOnClickListener {
+            val enabled = !image.drawingEnabled
+
+            image.setDrawingMode(enabled)
+
+            drawingButton.text =
+                if (enabled) "Navegar" else "Dibujar"
+        }
+
+        undoButton.setOnClickListener {
+            image.undoStroke()
+        }
+
+        clearButton.setOnClickListener {
+            image.clearPageStrokes()
+        }
 
         previousButton.setOnClickListener {
             if (currentPage > 0) {
@@ -201,6 +245,7 @@ class BoxPdfView(
                     } else {
                         val oldBitmap = currentBitmap
 
+                        image.showPage(index)
                         image.setImageBitmap(bitmap)
                         currentBitmap = bitmap
                         oldBitmap?.recycle()
