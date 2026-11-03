@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:box_pdf_sdk/box_pdf_sdk.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
