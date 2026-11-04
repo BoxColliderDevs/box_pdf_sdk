@@ -21,7 +21,7 @@ class BoxPdfSdkPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
 
         binding.platformViewRegistry.registerViewFactory(
             "com.boxcollider/box_pdf_viewer",
-            BoxPdfViewFactory()
+            BoxPdfViewFactory(binding.binaryMessenger)
         )
     }
 

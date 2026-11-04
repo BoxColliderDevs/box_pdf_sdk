@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:box_pdf_sdk/box_pdf_sdk.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -29,6 +31,8 @@ class PdfExamplePage extends StatefulWidget {
 class _PdfExamplePageState extends State<PdfExamplePage> {
   late final Future<Uint8List> _pdf;
 
+  BoxPdfController? _controller;
+
   @override
   void initState() {
     super.initState();
@@ -41,33 +45,98 @@ class _PdfExamplePageState extends State<PdfExamplePage> {
     return data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes);
   }
 
+  Future<void> _execute(Future<void> Function(BoxPdfController) action) async {
+    final controller = _controller;
+
+    if (controller == null) return;
+
+    try {
+      await action(controller);
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error al controlar el visor: $error')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final ready = _controller != null;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Box PDF SDK')),
       body: SafeArea(
-        child: FutureBuilder<Uint8List>(
-          future: _pdf,
-          builder: (context, snapshot) {
-            if (snapshot.hasError) {
-              return Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    'No se pudo cargar el archivo:\n${snapshot.error}',
-                  ),
+        child: Column(
+          children: [
+            Wrap(
+              spacing: 8,
+              children: [
+                TextButton(
+                  onPressed: ready
+                      ? () => _execute(
+                          (controller) => controller.setDrawingMode(true),
+                        )
+                      : null,
+                  child: const Text('Dibujar'),
                 ),
-              );
-            }
+                TextButton(
+                  onPressed: ready
+                      ? () => _execute(
+                          (controller) => controller.setDrawingMode(false),
+                        )
+                      : null,
+                  child: const Text('Navegar'),
+                ),
+                IconButton(
+                  tooltip: 'Deshacer',
+                  onPressed: ready
+                      ? () => _execute((controller) => controller.undo())
+                      : null,
+                  icon: const Icon(Icons.undo),
+                ),
+                IconButton(
+                  tooltip: 'Limpiar página',
+                  onPressed: ready
+                      ? () => _execute(
+                          (controller) => controller.clearCurrentPage(),
+                        )
+                      : null,
+                  icon: const Icon(Icons.delete_outline),
+                ),
+              ],
+            ),
+            Expanded(
+              child: FutureBuilder<Uint8List>(
+                future: _pdf,
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text('Error al cargar PDF: ${snapshot.error}'),
+                    );
+                  }
 
-            final bytes = snapshot.data;
+                  final bytes = snapshot.data;
 
-            if (bytes == null) {
-              return const Center(child: CircularProgressIndicator());
-            }
+                  if (bytes == null) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-            return BoxPdfViewer(bytes: bytes);
-          },
+                  return BoxPdfViewer(
+                    bytes: bytes,
+                    onCreated: (controller) {
+                      if (!mounted) return;
+
+                      setState(() {
+                        _controller = controller;
+                      });
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
         ),
       ),
     );

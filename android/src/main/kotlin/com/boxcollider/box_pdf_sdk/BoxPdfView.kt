@@ -18,11 +18,14 @@ import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 import android.widget.Toast
 import android.util.Log
+import io.flutter.plugin.common.BinaryMessenger
+import io.flutter.plugin.common.MethodChannel
 
 class BoxPdfView(
     private val context: Context,
     private val pdfBytes: ByteArray?
 ) : PlatformView {
+    private var controlChannel: MethodChannel? = null
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private val executor = Executors.newSingleThreadExecutor()
@@ -78,6 +81,62 @@ class BoxPdfView(
 
     private val widthButton = Button(context).apply {
         text = "Grosor: medio"
+    }
+
+    fun bindControlChannel(
+        messenger: BinaryMessenger,
+        viewId: Int
+    ) {
+        controlChannel?.setMethodCallHandler(null)
+
+        controlChannel = MethodChannel(
+            messenger,
+            "com.boxcollider/box_pdf_viewer_$viewId"
+        )
+
+        controlChannel?.setMethodCallHandler { call, result ->
+            if (disposed) {
+                result.error(
+                    "VIEW_DISPOSED",
+                    "El visor ya fue cerrado.",
+                    null
+                )
+            } else {
+                when (call.method) {
+                    "setDrawingMode" -> {
+                        val enabled =
+                            call.argument<Boolean>("enabled")
+
+                        if (enabled == null) {
+                            result.error(
+                                "INVALID_ARGUMENT",
+                                "Falta el argumento enabled.",
+                                null
+                            )
+                        } else {
+                            image.setDrawingMode(enabled)
+
+                            drawingButton.text =
+                                if (enabled) "Navegar" else "Dibujar"
+
+                            result.success(null)
+                        }
+                    }
+
+                    "undo" -> {
+                        image.undoStroke()
+                        result.success(null)
+                    }
+
+                    "clearCurrentPage" -> {
+                        image.clearPageStrokes()
+                        result.success(null)
+                    }
+
+                    else -> result.notImplemented()
+                }
+            }
+        }
     }
 
     init {
@@ -209,7 +268,7 @@ class BoxPdfView(
                 .setNegativeButton("Cancelar", null)
                 .show()
         }
-        root.addView(drawingControls)
+        //root.addView(drawingControls)
         root.addView(controls)
 
         drawingButton.setOnClickListener {
@@ -430,13 +489,14 @@ class BoxPdfView(
     }
 
     override fun getView(): View = root
-
     override fun dispose() {
         disposed = true
 
+        controlChannel?.setMethodCallHandler(null)
+        controlChannel = null
+
         image.onAnnotationsChanged = null
 
-        // Permite terminar los guardados que ya están en cola.
         executor.shutdown()
 
         image.setImageDrawable(null)

@@ -6,6 +6,7 @@
 // https://flutter.dev/to/pubspec-plugin-platforms.
 export 'src/box_pdf_viewer.dart';
 import 'box_pdf_sdk_platform_interface.dart';
+export 'src/box_pdf_controller.dart';
 
 class BoxPdfSdk {
   Future<String?> getPlatformVersion() {
