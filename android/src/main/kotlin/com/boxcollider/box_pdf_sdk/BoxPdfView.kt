@@ -36,6 +36,7 @@ class BoxPdfView(
     private var currentPage = 0
     private var totalPages = 0
     private var currentBitmap: Bitmap? = null
+    private var isRendering = false
 
     private val root = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
@@ -169,6 +170,42 @@ class BoxPdfView(
                             result.success(null)
                         }
                     }
+
+                    "nextPage", "previousPage" -> {
+                        when {
+                            isRendering -> {
+                                result.error(
+                                    "PAGE_BUSY",
+                                    "Espera a que termine de cargar la página.",
+                                    null
+                                )
+                            }
+
+                            totalPages <= 0 -> {
+                                result.error(
+                                    "DOCUMENT_NOT_READY",
+                                    "El documento todavía no está listo.",
+                                    null
+                                )
+                            }
+
+                            else -> {
+                                val offset =
+                                    if (call.method == "nextPage") 1 else -1
+
+                                val targetPage = currentPage + offset
+
+                                if (targetPage in 0 until totalPages) {
+                                    renderPage(targetPage)
+                                }
+
+                                // En la primera o última página,
+                                // pedir salir del rango no hace nada.
+                                result.success(null)
+                            }
+                        }
+                    }
+
                     else -> result.notImplemented()
                 }
             }
@@ -305,7 +342,7 @@ class BoxPdfView(
                 .show()
         }
         //root.addView(drawingControls)
-        root.addView(controls)
+        //root.addView(controls)
 
         drawingButton.setOnClickListener {
             val enabled = !image.drawingEnabled
@@ -396,8 +433,9 @@ class BoxPdfView(
     }
 
     private fun renderPage(index: Int) {
-        if (disposed) return
+        if (disposed || isRendering) return
 
+        isRendering = true
         previousButton.isEnabled = false
         nextButton.isEnabled = false
         status.text = "Cargando página ${index + 1}..."
@@ -493,6 +531,7 @@ class BoxPdfView(
 
                         currentPage = index
                         totalPages = pageCount
+                        isRendering = false
 
                         status.text =
                             "Página ${currentPage + 1} de $totalPages"
@@ -505,6 +544,8 @@ class BoxPdfView(
 
                 mainHandler.post {
                     if (!disposed) {
+                        isRendering = false
+
                         status.text =
                             "No se pudo abrir el PDF: ${error.message}"
 

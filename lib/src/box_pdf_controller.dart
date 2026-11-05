@@ -41,4 +41,12 @@ class BoxPdfController {
   Future<void> clearCurrentPage() {
     return _channel.invokeMethod<void>('clearCurrentPage');
   }
+
+  Future<void> nextPage() {
+    return _channel.invokeMethod<void>('nextPage');
+  }
+
+  Future<void> previousPage() {
+    return _channel.invokeMethod<void>('previousPage');
+  }
 }

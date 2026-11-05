@@ -141,6 +141,21 @@ class _PdfExamplePageState extends State<PdfExamplePage> {
                   icon: const Icon(Icons.undo),
                 ),
                 IconButton(
+                  tooltip: 'Página anterior',
+                  onPressed: ready
+                      ? () =>
+                            _execute((controller) => controller.previousPage())
+                      : null,
+                  icon: const Icon(Icons.chevron_left),
+                ),
+                IconButton(
+                  tooltip: 'Página siguiente',
+                  onPressed: ready
+                      ? () => _execute((controller) => controller.nextPage())
+                      : null,
+                  icon: const Icon(Icons.chevron_right),
+                ),
+                IconButton(
                   tooltip: 'Limpiar página',
                   onPressed: ready
                       ? () => _execute(
