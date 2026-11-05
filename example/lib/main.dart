@@ -32,6 +32,8 @@ class _PdfExamplePageState extends State<PdfExamplePage> {
   late final Future<Uint8List> _pdf;
 
   BoxPdfController? _controller;
+  Color _selectedColor = Colors.red;
+  double _selectedWidth = 0.006;
 
   @override
   void initState() {
@@ -57,6 +59,48 @@ class _PdfExamplePageState extends State<PdfExamplePage> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error al controlar el visor: $error')),
+      );
+    }
+  }
+
+  Future<void> _changeColor(Color color) async {
+    final controller = _controller;
+    if (controller == null) return;
+
+    try {
+      await controller.setColor(color);
+
+      if (!mounted) return;
+
+      setState(() {
+        _selectedColor = color;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo cambiar el color: $error')),
+      );
+    }
+  }
+
+  Future<void> _changeWidth(double width) async {
+    final controller = _controller;
+    if (controller == null) return;
+
+    try {
+      await controller.setStrokeWidth(width);
+
+      if (!mounted) return;
+
+      setState(() {
+        _selectedWidth = width;
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo cambiar el grosor: $error')),
       );
     }
   }
@@ -106,6 +150,70 @@ class _PdfExamplePageState extends State<PdfExamplePage> {
                   icon: const Icon(Icons.delete_outline),
                 ),
               ],
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: Wrap(
+                spacing: 16,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Color: '),
+                      DropdownButton<Color>(
+                        value: _selectedColor,
+                        onChanged: ready
+                            ? (color) {
+                                if (color != null) {
+                                  _changeColor(color);
+                                }
+                              }
+                            : null,
+                        items: const [
+                          DropdownMenuItem(
+                            value: Colors.red,
+                            child: Text('Rojo'),
+                          ),
+                          DropdownMenuItem(
+                            value: Colors.blue,
+                            child: Text('Azul'),
+                          ),
+                          DropdownMenuItem(
+                            value: Colors.black,
+                            child: Text('Negro'),
+                          ),
+                          DropdownMenuItem(
+                            value: Colors.green,
+                            child: Text('Verde'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Grosor: '),
+                      DropdownButton<double>(
+                        value: _selectedWidth,
+                        onChanged: ready
+                            ? (width) {
+                                if (width != null) {
+                                  _changeWidth(width);
+                                }
+                              }
+                            : null,
+                        items: const [
+                          DropdownMenuItem(value: 0.003, child: Text('Fino')),
+                          DropdownMenuItem(value: 0.006, child: Text('Medio')),
+                          DropdownMenuItem(value: 0.012, child: Text('Grueso')),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
             Expanded(
               child: FutureBuilder<Uint8List>(

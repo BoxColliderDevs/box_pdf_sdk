@@ -42,7 +42,7 @@ class ZoomPdfImageView(context: Context) : ImageView(context) {
     private val inkPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.RED
         style = Paint.Style.STROKE
-        strokeWidth = 0.003f
+        strokeWidth = 0.006f
         strokeCap = Paint.Cap.ROUND
         strokeJoin = Paint.Join.ROUND
     }

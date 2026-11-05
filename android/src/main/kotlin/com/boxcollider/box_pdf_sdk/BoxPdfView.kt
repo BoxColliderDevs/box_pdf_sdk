@@ -132,7 +132,43 @@ class BoxPdfView(
                         image.clearPageStrokes()
                         result.success(null)
                     }
+                    "setColor" -> {
+                        val color =
+                            call.argument<Number>("color")
 
+                        if (color == null) {
+                            result.error(
+                                "INVALID_ARGUMENT",
+                                "Falta el argumento color.",
+                                null
+                            )
+                        } else {
+                            image.setInkColor(color.toInt())
+                            result.success(null)
+                        }
+                    }
+
+                    "setStrokeWidth" -> {
+                        val width =
+                            call.argument<Number>("width")
+                                ?.toDouble()
+
+                        if (
+                            width == null ||
+                            !width.isFinite() ||
+                            width < 0.001 ||
+                            width > 0.02
+                        ) {
+                            result.error(
+                                "INVALID_ARGUMENT",
+                                "El grosor debe estar entre 0.001 y 0.02.",
+                                null
+                            )
+                        } else {
+                            image.setInkWidth(width.toFloat())
+                            result.success(null)
+                        }
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -205,7 +241,7 @@ class BoxPdfView(
             )
         }
 
-                root.addView(styleControls)
+                //root.addView(styleControls)
 
         colorButton.setOnClickListener {
             val names = arrayOf(
